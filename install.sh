@@ -100,11 +100,11 @@ arch-chroot /mnt /bin/bash <<EOF
   echo "LANG=en_US.UTF-8" > /etc/locale.conf && export LANG=en_US.UTF-8
   echo "Настраиваем сеть..."
   echo archbox > /etc/hostname
-  cat <<EOF >> /etc/hosts
+  cat <<EOA >> /etc/hosts
   127.0.0.1	localhost
   ::1	localhost
   127.0.1.1	archbox.localdomain archbox
-  EOF
+  EOA
   
   echo "Создание пользователя..."
   useradd -m  taminglinux
