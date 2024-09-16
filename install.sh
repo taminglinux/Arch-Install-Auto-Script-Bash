@@ -33,34 +33,17 @@ EOF
 echo "Информация с устройства $DISK удалена"
 # Разметка диска
 echo "Произвожу разметку диска $DISK"
-fdisk "$DISK" <<EOF
-g
-n
-1
 
-+512M
-Y
-n
-2
+# Очистка таблицы разделов
+parted "$DISK" mklabel gpt
+# Создание EFI раздела (512М, EFI)
+parted "$DISK" mkpart primary fat32 1MiB 513MiB
+parted "$DISK" set 1 boot on
+# Создание SWAP-раздела (1G, SWAP)
+parted "$DISK" mkpart primary linux-swap 513MiB 1537MiB
+# Создание корневого раздела
+parted "$DISK" mkpart primary ext4 1537MiB 100%
 
-+1G
-Y
-n
-3
-
-
-Y
-t
-1
-1
-t
-2
-19
-t
-2
-20
-w
-EOF
 echo "Разметка устройства $DISK завершена..."
 
 # Форматирование разделов
@@ -84,7 +67,10 @@ echo "Системные файлы установлены..."
 echo "Записываю информацию о смонтированных устройствах..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
-# Всё что выше - протестировано и должно работать. Далее отладка работы в chtoot.
+# Всё что выше - протестировано и должно работать. Далее отладка работы в chroot.
+
+HOSTNAME=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)
+read -p "Введите имя нового пользователя: " USERNAME
 
 # chroot
 echo "Переходим в chroot"
@@ -99,18 +85,20 @@ arch-chroot /mnt /bin/bash <<EOF
   locale-gen
   echo "LANG=en_US.UTF-8" > /etc/locale.conf && export LANG=en_US.UTF-8
   echo "Настраиваем сеть..."
-  echo archbox > /etc/hostname
- 
-  echo "127.0.0.1	localhost" > /etc/hosts
-  echo "::1	localhost" >> /etc/hosts
-  echo "127.0.1.1	archbox.localdomain archbox" >> /etc/hosts
+  echo "$HOSTNAME" > /etc/hostname
+
+echo "127.0.0.1    localhost
+::1    localhost
+127.0.1.1    $HOSTNAME.localdomain $HOSTNAME" > /etc/hosts
   
   echo "Создание пользователя..."
-  useradd -m  taminglinux
-  usermod -aG wheel,audio,video,optical,storage taminglinux
+  useradd -m  $USERNAME
+  echo "Установите пароль пользователя $USERNAME"
+  passwd $USERNAME
+  usermod -aG wheel,audio,video,optical,storage $USERNAME
   
   pacman -S --noconfirm sudo
-  echo "taminglinux ALL=(ALL) ALL" >> /etc/sudoers
+  echo "$USERNAME ALL=(ALL) ALL" >> /etc/sudoers
   
   pacman -S --noconfirm grub efibootmgr dosfstools os-prober mtools dhcpcd
   
