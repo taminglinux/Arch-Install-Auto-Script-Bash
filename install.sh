@@ -69,9 +69,18 @@ dialog --infobox "Устанавливаю системные файлы..." 3 4
 pacstrap -K /mnt base linux linux-firmware vim
 genfstab -U /mnt >> /mnt/etc/fstab
 
-HOSTNAME=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)
+HOSTNAME="arch-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)"
 USERNAME=$(dialog --inputbox "Введите имя нового пользователя:" 10 60 3>&1 1>&2 2>&3 3>&-)
-USER_PASS=$(dialog --insecure --passwordbox "Введите пароль для нового пользователя:" 10 60 3>&1 1>&2 2>&3)
+# Запрос и проверка пароля
+while true; do
+	USER_PASS1=$(dialog --insecure --passwordbox "Введите пароль для нового пользователя:" 10 60 3>&1 1>&2 2>&3)
+	USER_PASS2=$(dialog --insecure --passwordbox "Введите пароль для нового пользователя:" 10 60 3>&1 1>&2 2>&3)
+	if [ "$USER_PASS1" == "$USER_PASS2" ]; then
+		break
+	else
+		dialog --msgbox "Пароли не совпадают. Попробуйте ввести пароль повторно." 5 40
+	fi
+done
 
 DESKTOP_ENV=$(dialog --menu "Выберите окружение рабочего стола:" 15 50 4 \
 1 "LXDE" \
@@ -114,15 +123,27 @@ mkdir /boot/efi
 mount "${DISK}1" /boot/efi
 grub-install --target=x86_64-efi --bootloader-id=Arch_UEFI --recheck
 grub-mkconfig -o /boot/grub/grub.cfg
-echo "Включаем сеть и устанавливаем графику..."
-systemctl enable dhcpcd
-pacman -S --noconfirm $DESKTOP xorg-server xorg-apps
 
-# Дополнительная настройка LXDE
-if [ "$DESKTOP" = "lxde" ]; then
-	pacman -S --noconfirm lxdm &>/dev/null
-	systemctl enable lxdm.service
-fi
+# Дополнительная настройка окружений рабочего стола
+case $DESKTOP in
+	lxde)
+	pacman -S --noconfirm xorg-server xorg-apps xdg-user-dirs lxappearance lightdm lightdm-gtk-greeter lxsession
+	systemctl enable lightdm
+	;;
+	lxqt)
+	pacman -S --noconfirm xorg-server xorg-apps xdg-user-dirs lxqt sddm
+	systemctl enable sddm
+	;;
+	gnome)
+	pacman -S --noconfirm xorg-server xorg-apps gnome gnome-extra gdm
+	systemctl enable gdm
+	;;
+	plasma)
+	pacman -S --noconfirm xorg-server xorg-apps plasma kde-applications sddm
+	systemctl enable sddm
+	;;
+esac
+systemctl enable dhcpcd
 EOF
 
 dialog --msgbox "Установка завершена. Перезагрузите систему." 5 40
