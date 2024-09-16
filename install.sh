@@ -6,20 +6,18 @@ if [ "$(id -u)" -ne "0" ]; then
   exit 1
 fi
 
-# Проверяем подключение к сети интернет
-ping -c 1 www.archlinux.org
-ping -c 1 www.google.com
-
 # Настройка времени
 echo "Настраиваем системное время..."
 timedatectl set-ntp true
 timedatectl set-timezone Europe/Moscow
+echo "Настройка времени завершена..."
 
 # Выбор диска для установки системы
 echo "Список доступных дисков:"
 lsblk
 read -p "Укажите диск для разметки (например, /dev/sda): " DISK
 
+echo "Выполняю удаление данных с диска..."
 fdisk "$DISK" <<EOF
 g
 n
@@ -32,9 +30,7 @@ Y
 
 w
 EOF
-# Erase Disk!!
-dd if=/dev/random of="$DISK" bs=512 bc=100
-
+echo "Информация с устройства $DISK удалена"
 # Разметка диска
 echo "Произвожу разметку диска $DISK"
 fdisk "$DISK" <<EOF
@@ -65,66 +61,71 @@ t
 20
 w
 EOF
+echo "Разметка устройства $DISK завершена..."
 
 # Форматирование разделов
-echo "Форматирую разделы..."
+echo "Начинаю форматировать разделы..."
 mkfs.fat -F32 "${DISK}1"
+echo "Загрузочный раздел отформатирован..."
 mkswap "${DISK}2"
 swapon -v "${DISK}2"
+echo "Swap-пространство активировано..."
 mkfs.ext4 "${DISK}3"
+echo "Корневой раздел отформатирован..."
 
 # Монтирование ФС
-echo "Монтирую разделы.."
+echo "Монтирую корневой раздел.."
 mount "${DISK}3" /mnt
-mkdir /mnt/boot
-mount "${DISK}1" /mnt/boot
 
 # Устанавливаю системные файлы
-echo "Устанавливаю системные файлы.."
-pacstrap /mnt base linux linux-firmware vim
-
-echo "Генерация файловой системы"
+echo "Устанавливаю системные файлы..."
+pacstrap -K /mnt base linux linux-firmware vim
+echo "Системные файлы установлены..."
+echo "Записываю информацию о смонтированных устройствах..."
 genfstab -U /mnt >> /mnt/etc/fstab
+
+# Всё что выше - протестировано и должно работать. Далее отладка работы в chtoot.
 
 # chroot
 echo "Переходим в chroot"
 arch-chroot /mnt /bin/bash <<EOF
 
-  #Установка часового пояса
-  sudo ln -sf /usr/share/zoneinfo/Region/City /etc/localtime
-  sudo hwclock --systohc
-  sudo echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
-  sudo echo "ru_RU.UTF-8 UTF-8" >> /etc/locale.gen
-  sudo locale-gen
-  sudo echo "LANG=en_US.UTF-8" > /etc/locale.conf
-  # Установка hostname и настройка сети
-  sudo echo "archbox" > /etc/hostname
-  sudo echo "127.0.0.1	localhost
+  echo "Настройка часового пояса..."
+  ln -sf /usr/share/zoneinfo/Region/City /etc/localtime
+  hwclock --systohc
+  echo "Выполняем языковые настройки..."
+  echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+  echo "ru_RU.UTF-8 UTF-8" >> /etc/locale.gen
+  locale-gen
+  echo "LANG=en_US.UTF-8" > /etc/locale.conf && export LANG=en_US.UTF-8
+  echo "Настраиваем сеть..."
+  echo archbox > /etc/hostname
+  cat <<EOF >> /etc/hosts
+  127.0.0.1	localhost
   ::1	localhost
-  127.0.1.1	archbox.localdomain archbox" > /etc/hosts
+  127.0.1.1	archbox.localdomain archbox
+  EOF
   
-  sudo useradd -m  taminglinux
-  sudo echo "Установите пароль для пользователя по умолчанию:"
-  sudo passwd taminglinux
+  echo "Создание пользователя..."
+  useradd -m  taminglinux
+  usermod -aG wheel,audio,video,optical,storage taminglinux
   
-  sudo usermod -aG wheel,audio,video,optical,storage taminglinux
+  pacman -S --noconfirm sudo
+  echo "taminglinux ALL=(ALL) ALL" >> /etc/sudoers
   
-  sudo pacman -S --noconfirm sudo
-  sudo echo "taminglinux ALL=(ALL) ALL" >> /etc/sudoers
+  pacman -S --noconfirm grub efibootmgr dosfstools os-prober mtools dhcpcd
   
-  sudo pacman -S --noconfirm grub efibootmgr dosfstools os-prober mtools dhcpcd
-   
-  sudo echo "Перед повторным маунтом EFI, я выведу тебе стату по дискам"
-  sudo  df -h
-   
-  sudo mkdir /boot/EFI
-  sudo mount "${DISK}1" /boot/EFI
-
-  sudo grub-install --target=x86_64-efi --bootloader-id=Arch_UEFI --recheck
-  sudo grub-mkconfig -o /boot/grub/grub.cfg
+  echo "Подготовка к установке загрузчика..."
+  mkdir /boot/efi
+  mount "${DISK}1" /boot/efi
+  echo "Установка загрузчика..."
+  grub-install --target=x86_64-efi --bootloader-id=Arch_UEFI --recheck
+  grub-mkconfig -o /boot/grub/grub.cfg
   
-  # Включаем сеть
-  sudo systemctl enable dhcpcd
+  echo "Включаем сеть и устанавливаем графику..."
+  systemctl enable dhcpcd
+  pacman -S xorg-server xorg-apps
+  
 EOF
 
 echo "Установка завершена. Перезагрузите систему."
