@@ -100,11 +100,10 @@ arch-chroot /mnt /bin/bash <<EOF
   echo "LANG=en_US.UTF-8" > /etc/locale.conf && export LANG=en_US.UTF-8
   echo "Настраиваем сеть..."
   echo archbox > /etc/hostname
-  cat <<EOA >> /etc/hosts
-  127.0.0.1	localhost
-  ::1	localhost
-  127.0.1.1	archbox.localdomain archbox
-  EOA
+ 
+  echo "127.0.0.1	localhost" > /etc/hosts
+  echo "::1	localhost" >> /etc/hosts
+  echo "127.0.1.1	archbox.localdomain archbox" >> /etc/hosts
   
   echo "Создание пользователя..."
   useradd -m  taminglinux
@@ -124,7 +123,7 @@ arch-chroot /mnt /bin/bash <<EOF
   
   echo "Включаем сеть и устанавливаем графику..."
   systemctl enable dhcpcd
-  pacman -S xorg-server xorg-apps
+  pacman -S --noconfirm xorg-server xorg-apps
   
 EOF
 
