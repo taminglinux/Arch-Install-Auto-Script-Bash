@@ -21,8 +21,7 @@ dialog --infobox "Настраиваем системное время..." 3 40
 timedatectl set-ntp true
 timedatectl set-timezone Europe/Moscow
 sleep 2
-dialog --msgbox "Настройка времени завершена..." 5 40
-sleep 2
+dialog --pause "Настройка времени завершена..." 5 40 2
 
 # Выбор диска для установки системы
 DISKS=$(lsblk -d -p -n -o NAME,SIZE | grep -E "^/dev/[a-z]+")
@@ -46,8 +45,7 @@ parted --script "$DISK" set 1 boot on
 parted --script "$DISK" mkpart primary linux-swap 513MiB 1537MiB
 parted --script "$DISK" mkpart primary ext4 1537MiB 100%
 sleep 2
-dialog --msgbox "Разметка устройства $DISK завершена..." 5 40
-sleep 2
+dialog --pause "Разметка устройства $DISK завершена..." 5 40 5
 
 # Форматирование разделов
 dialog --infobox "Форматирую разделы..." 3 40
@@ -56,10 +54,9 @@ mkswap "${DISK}2"
 swapon "${DISK}2"
 mkfs.ext4 "${DISK}3"
 sleep 2
-dialog --msgbox "Форматирование разделов завершено." 5 40
-sleep 2
+dialog --pause "Форматирование разделов завершено." 5 40 2
 
-dialog --msgbox "Монтирую корневой раздел..." 5 40
+dialog --pause "Монтирую корневой раздел..." 5 40 2
 mount "${DISK}3" /mnt
 
 # Устанавливаю системные файлы
