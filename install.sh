@@ -117,6 +117,12 @@ grub-mkconfig -o /boot/grub/grub.cfg
 echo "Включаем сеть и устанавливаем графику..."
 systemctl enable dhcpcd
 pacman -S --noconfirm $DESKTOP xorg-server xorg-apps
+
+# Дополнительная настройка LXDE
+if [ "$DESKTOP" = "lxde" ]; then
+	pacman -S --noconfirm lxdm &>/dev/null
+	systemctl enable lxdm.service
+fi
 EOF
 
 dialog --msgbox "Установка завершена. Перезагрузите систему." 5 40
